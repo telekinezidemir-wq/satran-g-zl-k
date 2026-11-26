@@ -16,10 +16,13 @@ targets:
       - path: SatrancGozluk
         excludes:
           - Info.plist
+          - SatrancGozluk.entitlements
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.satrancgozluk.app
+        PRODUCT_BUNDLE_IDENTIFIER: com.telekinezidemir.satrancgozluk
         INFOPLIST_FILE: SatrancGozluk/Info.plist
+        CODE_SIGN_ENTITLEMENTS: SatrancGozluk/SatrancGozluk.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: NO
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"

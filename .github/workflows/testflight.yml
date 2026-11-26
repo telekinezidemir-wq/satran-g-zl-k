@@ -1,0 +1,111 @@
+# Uygulamayı imzalayıp TestFlight'a yükler (Apple Developer Program üyeliği gerekir).
+# Çalıştırmak: Actions → "TestFlight'a gönder" → Run workflow.
+#
+# Gerekli GitHub secret'ları (Settings → Secrets and variables → Actions → New repository secret):
+#   APPLE_TEAM_ID   — developer.apple.com → Membership details → Team ID (10 karakter)
+#   ASC_KEY_ID      — App Store Connect → Users and Access → Integrations → Keys → Key ID
+#   ASC_ISSUER_ID   — aynı sayfadaki Issuer ID
+#   ASC_KEY_P8      — indirilen AuthKey_XXXX.p8 dosyasının tüm içeriği (BEGIN/END satırları dahil)
+# İsteğe bağlı değişken (Variables sekmesi): BUNDLE_ID (varsayılan: com.telekinezidemir.satrancgozluk)
+name: TestFlight'a gönder
+
+on:
+  workflow_dispatch:
+
+jobs:
+  testflight:
+    runs-on: macos-26-intel
+    timeout-minutes: 50
+    env:
+      TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      BUNDLE_ID: ${{ vars.BUNDLE_ID || 'com.telekinezidemir.satrancgozluk' }}
+      BUILD_NUMBER: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gizli bilgileri kontrol et
+        run: |
+          missing=0
+          for v in TEAM_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do
+            if [ -z "${!v}" ]; then echo "Eksik secret: $v"; missing=1; fi
+          done
+          exit $missing
+
+      - name: API anahtarını hazırla
+        run: |
+          KEY="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
+          printf '%s\n' "$ASC_KEY_P8" > "$KEY"
+          echo "KEY_PATH=$KEY" >> "$GITHUB_ENV"
+          xcodebuild -version
+
+      - name: XcodeGen ile projeyi üret
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Arşivle (otomatik imzalama)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project SatrancGozluk.xcodeproj \
+            -scheme SatrancGozluk \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/SatrancGozluk.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGN_IDENTITY="Apple Development" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            archive 2>&1 | tee archive.log | grep -E "error:|ARCHIVE (SUCCEEDED|FAILED)|\*\* " || true
+          grep -q "ARCHIVE SUCCEEDED" archive.log
+
+      - name: Arşiv hataları (başarısızsa)
+        if: failure()
+        run: grep -E "error:" archive.log | head -40 || tail -60 archive.log
+
+      - name: TestFlight'a yükle
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>${TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+            <key>testFlightInternalTestingOnly</key><true/>
+          </dict>
+          </plist>
+          EOF
+          set -o pipefail
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/SatrancGozluk.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" 2>&1 | tee export.log | tail -25
+          grep -qE "EXPORT SUCCEEDED|Upload succeeded|Uploaded" export.log
+
+      - name: Kayıtları yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testflight-logs
+          path: |
+            archive.log
+            export.log
+          retention-days: 14
