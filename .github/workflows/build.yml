@@ -47,6 +47,10 @@ jobs:
           echo "Uygulama: $APP"
           mkdir -p Payload
           cp -R "$APP" Payload/
+          echo "Gömülü kütüphaneler:"; ls Payload/*.app/Frameworks
+          for f in MWDATCore MWDATCamera MWDATDisplay; do
+            test -d "Payload/$(basename "$APP")/Frameworks/$f.framework" || { echo "EKSİK: $f"; exit 1; }
+          done
           zip -qry SatrancGozluk.ipa Payload
           ls -la SatrancGozluk.ipa
 
