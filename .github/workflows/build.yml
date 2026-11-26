@@ -9,7 +9,8 @@ on:
 
 jobs:
   build:
-    runs-on: macos-26
+    # Apple Silicon (macos-26) kuyruğu kapasite nedeniyle dolu olabiliyor; Intel Mac daha boş.
+    runs-on: macos-26-intel
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
