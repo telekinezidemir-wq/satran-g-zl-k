@@ -1,0 +1,39 @@
+# XcodeGen proje tanımı — GitHub Actions'taki Mac sunucusu bundan Xcode projesini üretir.
+name: SatrancGozluk
+options:
+  bundleIdPrefix: com.satrancgozluk
+  deploymentTarget:
+    iOS: "17.2"
+packages:
+  MetaWearablesDAT:
+    url: https://github.com/meta/meta-wearables-dat-ios
+    exactVersion: 1.1.0
+targets:
+  SatrancGozluk:
+    type: application
+    platform: iOS
+    sources:
+      - path: SatrancGozluk
+        excludes:
+          - Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.satrancgozluk.app
+        INFOPLIST_FILE: SatrancGozluk/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
+    dependencies:
+      - package: MetaWearablesDAT
+        product: MWDATCore
+      - package: MetaWearablesDAT
+        product: MWDATCamera
+      - package: MetaWearablesDAT
+        product: MWDATDisplay
+    scheme: {}
